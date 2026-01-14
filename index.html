@@ -270,15 +270,16 @@ body{
 </div>
 
 <script>
+/* ================== DATA DASAR ================== */
 const months = [
   "Januari","Februari","Maret","April","Mei","Juni",
   "Juli","Agustus","September","Oktober","November","Desember"
 ];
 
-let current = new Date(2026,0);
+let current = new Date(2026, 0);
 let selectedDate = "";
 
-// Libur Nasional Indonesia 2026 (utama)
+/* ================== LIBUR NASIONAL ================== */
 const holidays = {
   "2026-01-01":"Tahun Baru",
   "2026-01-16":"Isra Mi'raj",
@@ -297,75 +298,111 @@ const holidays = {
   "2026-12-25":"Natal"
 };
 
-const events = JSON.parse(localStorage.getItem("agenda2026") || "{}");
+/* ================== EVENT STATE ================== */
+const events = {};
 
+/* ================== RENDER KALENDER ================== */
 function render(){
   const days = document.getElementById("days");
-  days.innerHTML="";
+  days.innerHTML = "";
+
   document.getElementById("monthYear").innerText =
-    months[current.getMonth()]+" 2026";
+    months[current.getMonth()] + " 2026";
 
-  const first = new Date(2026,current.getMonth(),1).getDay();
-  const total = new Date(2026,current.getMonth()+1,0).getDate();
+  const first = new Date(2026, current.getMonth(), 1).getDay();
+  const total = new Date(2026, current.getMonth() + 1, 0).getDate();
 
-  for(let i=0;i<first;i++) days.innerHTML+=`<div class="day"></div>`;
+  for(let i = 0; i < first; i++){
+    days.innerHTML += `<div class="day"></div>`;
+  }
 
-  for(let d=1; d<=total; d++){
-    const date = `2026-${String(current.getMonth()+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-    let html = `<div class="day" onclick="openModal('${date}')"><span>${d}</span>`;
+  for(let d = 1; d <= total; d++){
+    const date =
+      `2026-${String(current.getMonth()+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+
+    let html = `<div class="day" onclick="openModal('${date}')">
+                  <span>${d}</span>`;
 
     if(holidays[date]){
-      html+=`<div class="event libur">${holidays[date]}</div>`;
+      html += `<div class="event libur">${holidays[date]}</div>`;
     }
 
     if(events[date]){
-      html+=`<div class="event ${events[date].type}">${events[date].title}</div>`;
+      html += `<div class="event ${events[date].type}">
+                 ${events[date].title}
+               </div>`;
     }
 
-    html+="</div>";
-    days.innerHTML+=html;
+    html += `</div>`;
+    days.innerHTML += html;
   }
 }
 
-function logout(){
-  localStorage.removeItem("bemLogin");
-  location.reload();
+/* ================== FIRESTORE ================== */
+async function loadEvents(){
+  const snap = await getDocs(collection(db, "events"));
+  snap.forEach(docu => {
+    events[docu.id] = docu.data();
+  });
+  render();
 }
 
+async function saveEvent(){
+  if(!selectedDate) return;
 
+  const data = {
+    title: document.getElementById("title").value,
+    type: document.getElementById("type").value,
+    date: selectedDate,
+    year: 2026
+  };
+
+  await setDoc(
+    doc(db, "events", selectedDate),
+    data
+  );
+
+  events[selectedDate] = data;
+  closeModal();
+  render();
+}
+
+async function deleteEvent(){
+  if(!selectedDate) return;
+
+  await deleteDoc(
+    doc(db, "events", selectedDate)
+  );
+
+  delete events[selectedDate];
+  closeModal();
+  render();
+}
+
+/* ================== MODAL ================== */
 function openModal(date){
   selectedDate = date;
-  document.getElementById("modal").style.display="flex";
+  document.getElementById("modal").style.display = "flex";
   document.getElementById("title").value = events[date]?.title || "";
   document.getElementById("type").value = events[date]?.type || "bem";
 }
 
 function closeModal(){
-  document.getElementById("modal").style.display="none";
+  document.getElementById("modal").style.display = "none";
 }
 
-function saveEvent(){
-  events[selectedDate] = {
-    title: title.value,
-    type: type.value
-  };
-  localStorage.setItem("agenda2026", JSON.stringify(events));
-  closeModal(); render();
+/* ================== NAV BULAN ================== */
+function prevMonth(){
+  current.setMonth(current.getMonth() - 1);
+  render();
 }
 
-function deleteEvent(){
-  delete events[selectedDate];
-  localStorage.setItem("agenda2026", JSON.stringify(events));
-  closeModal(); render();
+function nextMonth(){
+  current.setMonth(current.getMonth() + 1);
+  render();
 }
 
-function prevMonth(){ current.setMonth(current.getMonth()-1); render();}
-function nextMonth(){ current.setMonth(current.getMonth()+1); render();}
-
-render();
-</script>
-
-<script>
+/* ================== LOGIN DUMMY ================== */
 const USER_EMAIL = "bem@bem.com";
 const USER_PASSWORD = "bemkuat";
 
@@ -376,9 +413,14 @@ function login(){
   if(email === USER_EMAIL && password === USER_PASSWORD){
     localStorage.setItem("bemLogin", "true");
     showApp();
-  }else{
+  } else {
     alert("Email atau password salah!");
   }
+}
+
+function logout(){
+  localStorage.removeItem("bemLogin");
+  location.reload();
 }
 
 function showApp(){
@@ -392,8 +434,11 @@ function checkLogin(){
   }
 }
 
+/* ================== INIT ================== */
 checkLogin();
+loadEvents();
 </script>
+
 
 </body>
 </html>
